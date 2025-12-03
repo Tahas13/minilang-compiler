@@ -11,11 +11,13 @@ from dataclasses import dataclass
 class Symbol:
     """Represents a symbol in the symbol table."""
     name: str
-    type: str  # 'int', 'float', 'bool'
+    type: str  # 'int', 'float', 'bool', or function return type
     value: Optional[Any] = None
     line: int = 0
     column: int = 0
     initialized: bool = False
+    is_function: bool = False
+    param_types: Optional[list] = None  # List of parameter types for functions
 
 class SymbolTable:
     """Symbol table for tracking variable declarations and their types."""

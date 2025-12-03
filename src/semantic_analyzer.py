@@ -59,6 +59,14 @@ class TypeChecker(ASTVisitor):
             return self.get_binary_op_type(expr)
         elif isinstance(expr, UnaryOp):
             return self.get_unary_op_type(expr)
+        elif isinstance(expr, FunctionCall):
+            # Visit the function call to check semantics
+            self.visit_function_call(expr)
+            # Return the function's return type
+            symbol = self.current_scope.lookup(expr.name)
+            if symbol and symbol.is_function:
+                return symbol.type
+            return None
         else:
             self.add_error(f"Unknown expression type: {type(expr).__name__}")
             return None
@@ -222,6 +230,45 @@ class TypeChecker(ASTVisitor):
         for stmt in node.body:
             self.visit(stmt)
     
+    def visit_for_statement(self, node: ForStatement):
+        """Visit for statement node."""
+        # Create new scope for the for loop
+        old_scope = self.current_scope
+        self.current_scope = self.current_scope.create_child_scope()
+        
+        try:
+            # Visit initialization
+            if node.init:
+                self.visit(node.init)
+            
+            # Check condition type
+            if node.condition:
+                condition_type = self.get_expression_type(node.condition)
+                if condition_type and condition_type != 'bool':
+                    self.add_error(f"For loop condition must be boolean, got {condition_type}")
+            
+            # Visit update
+            if node.update:
+                self.visit(node.update)
+            
+            # Visit body statements
+            for stmt in node.body:
+                self.visit(stmt)
+        finally:
+            # Restore previous scope
+            self.current_scope = old_scope
+    
+    def visit_do_while_statement(self, node: DoWhileStatement):
+        """Visit do-while statement node."""
+        # Visit body statements first (executed at least once)
+        for stmt in node.body:
+            self.visit(stmt)
+        
+        # Check condition type
+        condition_type = self.get_expression_type(node.condition)
+        if condition_type and condition_type != 'bool':
+            self.add_error(f"Do-while condition must be boolean, got {condition_type}")
+    
     def visit_block(self, node: Block):
         """Visit block node (creates new scope)."""
         # Create new scope for the block
@@ -235,6 +282,81 @@ class TypeChecker(ASTVisitor):
         finally:
             # Restore previous scope
             self.current_scope = old_scope
+    
+    def visit_function_declaration(self, node: FunctionDeclaration):
+        """Visit function declaration node."""
+        # Check if function is already declared in current scope
+        if node.name in self.current_scope.symbols:
+            self.add_error(f"Function '{node.name}' already declared in this scope")
+            return
+        
+        # Add function to symbol table
+        # parameters is a list of (type, name) tuples
+        param_types = [param[0] for param in node.parameters]
+        self.current_scope.define(
+            node.name,
+            node.return_type,
+            value=True  # Functions are always "initialized"
+        )
+        # Update the symbol to mark it as a function
+        symbol = self.current_scope.symbols[node.name]
+        symbol.is_function = True
+        symbol.param_types = param_types
+        
+        # Create new scope for function body
+        old_scope = self.current_scope
+        self.current_scope = self.current_scope.create_child_scope()
+        
+        try:
+            # Add parameters to function scope
+            # parameters is a list of (type, name) tuples
+            for param_type, param_name in node.parameters:
+                if param_name in self.current_scope.symbols:
+                    self.add_error(f"Parameter '{param_name}' already declared")
+                else:
+                    self.current_scope.define(
+                        param_name,
+                        param_type,
+                        value=True  # Parameters are considered initialized
+                    )
+            
+            # Visit function body
+            for stmt in node.body:
+                self.visit(stmt)
+        finally:
+            # Restore previous scope
+            self.current_scope = old_scope
+    
+    def visit_return_statement(self, node: ReturnStatement):
+        """Visit return statement node."""
+        # Check that the return value type matches function return type
+        # (simplified check - would need function context in full implementation)
+        if node.value:
+            self.get_expression_type(node.value)
+    
+    def visit_function_call(self, node: FunctionCall):
+        """Visit function call node."""
+        # Check if function is declared
+        symbol = self.current_scope.lookup(node.name)
+        if symbol is None:
+            self.add_error(f"Undefined function: {node.name}")
+            return
+        
+        if not symbol.is_function:
+            self.add_error(f"'{node.name}' is not a function")
+            return
+        
+        # Check argument count
+        if symbol.param_types and len(node.arguments) != len(symbol.param_types):
+            self.add_error(f"Function '{node.name}' expects {len(symbol.param_types)} arguments, got {len(node.arguments)}")
+            return
+        
+        # Check argument types
+        if symbol.param_types:
+            for i, (arg, expected_type) in enumerate(zip(node.arguments, symbol.param_types)):
+                arg_type = self.get_expression_type(arg)
+                if arg_type and not self.can_assign(expected_type, arg_type):
+                    self.add_error(f"Argument {i+1} of function '{node.name}': expected {expected_type}, got {arg_type}")
     
     def visit_binary_op(self, node: BinaryOp):
         """Visit binary operation node."""
