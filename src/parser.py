@@ -122,9 +122,17 @@ class Parser:
     
     def parse_statement(self) -> Statement:
         """Parse a statement."""
+        # Function declaration
+        if self.check(TokenType.FUNCTION):
+            return self.parse_function_declaration()
+        
         # Variable declaration
         if self.check(TokenType.INT) or self.check(TokenType.FLOAT) or self.check(TokenType.BOOL):
             return self.parse_var_declaration()
+        
+        # Return statement
+        if self.check(TokenType.RETURN):
+            return self.parse_return_statement()
         
         # Print statement
         if self.check(TokenType.PRINT):
@@ -138,12 +146,23 @@ class Parser:
         if self.check(TokenType.WHILE):
             return self.parse_while_statement()
         
+        # For statement
+        if self.check(TokenType.FOR):
+            return self.parse_for_statement()
+        
+        # Do-while statement
+        if self.check(TokenType.DO):
+            return self.parse_do_while_statement()
+        
         # Block statement
         if self.check(TokenType.LEFT_BRACE):
             return self.parse_block()
         
-        # Assignment statement (must check this after other statements)
+        # Assignment or function call statement
         if self.check(TokenType.IDENTIFIER):
+            # Look ahead to determine if it's assignment or function call
+            if self.peek_token().type == TokenType.LEFT_PAREN:
+                return self.parse_function_call_statement()
             return self.parse_assignment()
         
         raise ParseError(f"Unexpected token: {self.current_token().value}", self.current_token())
@@ -213,6 +232,134 @@ class Parser:
         body = [body_stmt] if not isinstance(body_stmt, Block) else body_stmt.statements
         
         return WhileStatement(condition, body)
+    
+    def parse_for_statement(self) -> ForStatement:
+        """Parse for statement: 'for' '(' init ';' condition ';' update ')' statement"""
+        self.advance()  # consume 'for'
+        self.consume(TokenType.LEFT_PAREN, "Expected '(' after 'for'")
+        
+        # Parse init
+        init = None
+        if self.check(TokenType.INT) or self.check(TokenType.FLOAT) or self.check(TokenType.BOOL):
+            # Variable declaration (parse without consuming semicolon)
+            var_type = self.advance().value
+            name = self.consume(TokenType.IDENTIFIER, "Expected identifier").value
+            value = None
+            if self.match(TokenType.ASSIGN):
+                value = self.parse_expression()
+            init = VarDeclaration(var_type, name, value)
+        elif self.check(TokenType.IDENTIFIER):
+            # Assignment (parse without consuming semicolon)
+            name = self.advance().value
+            self.consume(TokenType.ASSIGN, "Expected '=' in assignment")
+            value = self.parse_expression()
+            init = Assignment(name, value)
+        
+        self.consume(TokenType.SEMICOLON, "Expected ';' after for init")
+        
+        # Parse condition
+        condition = None
+        if not self.check(TokenType.SEMICOLON):
+            condition = self.parse_expression()
+        self.consume(TokenType.SEMICOLON, "Expected ';' after for condition")
+        
+        # Parse update
+        update = None
+        if not self.check(TokenType.RIGHT_PAREN):
+            if self.check(TokenType.IDENTIFIER):
+                name = self.advance().value
+                self.consume(TokenType.ASSIGN, "Expected '=' in for update")
+                value = self.parse_expression()
+                update = Assignment(name, value)
+        
+        self.consume(TokenType.RIGHT_PAREN, "Expected ')' after for header")
+        
+        # Parse body
+        body_stmt = self.parse_statement()
+        body = [body_stmt] if not isinstance(body_stmt, Block) else body_stmt.statements
+        
+        return ForStatement(init, condition, update, body)
+    
+    def parse_do_while_statement(self) -> DoWhileStatement:
+        """Parse do-while statement: 'do' statement 'while' '(' expression ')' ';'"""
+        self.advance()  # consume 'do'
+        
+        body_stmt = self.parse_statement()
+        body = [body_stmt] if not isinstance(body_stmt, Block) else body_stmt.statements
+        
+        self.consume(TokenType.WHILE, "Expected 'while' after do body")
+        self.consume(TokenType.LEFT_PAREN, "Expected '(' after 'while'")
+        condition = self.parse_expression()
+        self.consume(TokenType.RIGHT_PAREN, "Expected ')' after condition")
+        self.consume(TokenType.SEMICOLON, "Expected ';' after do-while statement")
+        
+        return DoWhileStatement(body, condition)
+    
+    def parse_function_declaration(self) -> FunctionDeclaration:
+        """Parse function declaration: 'function' type IDENTIFIER '(' params ')' '{' statements '}'"""
+        self.advance()  # consume 'function'
+        
+        # Parse return type
+        if not (self.check(TokenType.INT) or self.check(TokenType.FLOAT) or self.check(TokenType.BOOL)):
+            raise ParseError("Expected return type after 'function'", self.current_token())
+        return_type = self.advance().value
+        
+        # Parse function name
+        name = self.consume(TokenType.IDENTIFIER, "Expected function name").value
+        
+        # Parse parameters
+        self.consume(TokenType.LEFT_PAREN, "Expected '(' after function name")
+        parameters = []
+        while not self.check(TokenType.RIGHT_PAREN) and not self.check(TokenType.EOF):
+            param_type_token = self.current_token()
+            if not (self.check(TokenType.INT) or self.check(TokenType.FLOAT) or self.check(TokenType.BOOL)):
+                raise ParseError("Expected parameter type", param_type_token)
+            param_type = self.advance().value
+            param_name = self.consume(TokenType.IDENTIFIER, "Expected parameter name").value
+            parameters.append((param_type, param_name))
+            
+            if not self.check(TokenType.RIGHT_PAREN):
+                self.consume(TokenType.COMMA, "Expected ',' between parameters")
+        
+        self.consume(TokenType.RIGHT_PAREN, "Expected ')' after parameters")
+        
+        # Parse body
+        self.consume(TokenType.LEFT_BRACE, "Expected '{' after function header")
+        body = []
+        while not self.check(TokenType.RIGHT_BRACE) and not self.check(TokenType.EOF):
+            if self.match(TokenType.NEWLINE):
+                continue
+            body.append(self.parse_statement())
+        self.consume(TokenType.RIGHT_BRACE, "Expected '}' after function body")
+        
+        return FunctionDeclaration(return_type, name, parameters, body)
+    
+    def parse_return_statement(self) -> ReturnStatement:
+        """Parse return statement: 'return' expression? ';'"""
+        self.advance()  # consume 'return'
+        
+        value = None
+        if not self.check(TokenType.SEMICOLON):
+            value = self.parse_expression()
+        
+        self.consume(TokenType.SEMICOLON, "Expected ';' after return statement")
+        return ReturnStatement(value)
+    
+    def parse_function_call_statement(self) -> FunctionCall:
+        """Parse function call as statement: IDENTIFIER '(' args ')' ';'"""
+        name = self.advance().value
+        self.consume(TokenType.LEFT_PAREN, "Expected '(' after function name")
+        
+        arguments = []
+        while not self.check(TokenType.RIGHT_PAREN) and not self.check(TokenType.EOF):
+            arguments.append(self.parse_expression())
+            if not self.check(TokenType.RIGHT_PAREN):
+                self.consume(TokenType.COMMA, "Expected ',' between arguments")
+        
+        self.consume(TokenType.RIGHT_PAREN, "Expected ')' after arguments")
+        self.consume(TokenType.SEMICOLON, "Expected ';' after function call")
+        
+        return FunctionCall(name, arguments)
     
     def parse_block(self) -> Block:
         """Parse block: '{' statement_list '}'"""
@@ -332,9 +479,20 @@ class Parser:
             value = self.advance().value
             return FloatLiteral(value)
         
-        # Identifier
+        # Identifier or function call
         if self.check(TokenType.IDENTIFIER):
             name = self.advance().value
+            
+            # Check if it's a function call
+            if self.match(TokenType.LEFT_PAREN):
+                arguments = []
+                while not self.check(TokenType.RIGHT_PAREN) and not self.check(TokenType.EOF):
+                    arguments.append(self.parse_expression())
+                    if not self.check(TokenType.RIGHT_PAREN):
+                        self.consume(TokenType.COMMA, "Expected ',' between arguments")
+                self.consume(TokenType.RIGHT_PAREN, "Expected ')' after arguments")
+                return FunctionCall(name, arguments)
+            
             return Identifier(name)
         
         # Parenthesized expression

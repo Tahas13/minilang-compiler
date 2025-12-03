@@ -315,41 +315,47 @@ float result = pi * a;
 print(sum);
 print(result);""",
 
-        "Arithmetic Operations": """// Complex arithmetic expressions
+        "For Loop": """// For loop - Sum of numbers 1 to 10
+int sum = 0;
+
+for (int i = 1; i <= 10; i = i + 1) {
+    sum = sum + i;
+}
+
+print(sum);""",
+
+        "Do-While Loop": """// Do-while loop - Countdown from 5
+int count = 5;
+
+do {
+    print(count);
+    count = count - 1;
+} while (count > 0);""",
+
+        "Function - Add": """// Function to add two numbers
+function int add(int a, int b) {
+    int result = a + b;
+    return result;
+}
+
 int x = 10;
-int y = 5;
-int sum = x + y;
-int diff = x - y;
-int product = x * y;
-int quotient = x / y;
+int y = 20;
+int sum = add(x, y);
+print(sum);""",
 
-print(sum);
-print(diff);
-print(product);
-print(quotient);""",
+        "Function - Factorial": """// Recursive factorial function
+function int factorial(int n) {
+    if (n <= 1) {
+        return 1;
+    } else {
+        int result = n * factorial(n - 1);
+        return result;
+    }
+}
 
-        "Boolean Logic": """// Boolean expressions and logic
-bool a = true;
-bool b = false;
-
-bool andResult = a and b;
-bool orResult = a or b;
-bool notResult = not a;
-
-print(andResult);
-print(orResult);
-print(notResult);""",
-
-        "Type System": """// Mixed type operations
-int whole = 10;
-float decimal = 3.14;
-bool flag = true;
-
-float result = decimal * 2.0;
-int calc = whole * 2;
-
-print(calc);
-print(result);""",
+int num = 5;
+int fact = factorial(num);
+print(fact);""",
 
         "Conditional Statements": """// If-else statements
 int score = 85;
@@ -375,39 +381,33 @@ while (counter > 0) {
 
 print(counter);""",
 
-        "Nested Loops": """// Nested while loops
-int i = 1;
-while (i <= 3) {
-    int j = 1;
-    while (j <= 3) {
+        "Nested Loops": """// Nested for loops
+for (int i = 1; i <= 3; i = i + 1) {
+    for (int j = 1; j <= 3; j = j + 1) {
         int product = i * j;
         print(product);
-        j = j + 1;
     }
-    i = i + 1;
 }""",
 
-        "Complex Program": """// Comprehensive example with all current features
-int x = 10;
-int y = 5;
-bool continueLoop = true;
-
-if (x > y) {
-    int counter = 3;
-    while (counter > 0) {
-        int result = x - counter;
-        print(result);
-        counter = counter - 1;
+        "All Features": """// Comprehensive example
+function int power(int base, int exp) {
+    int result = 1;
+    for (int i = 0; i < exp; i = i + 1) {
+        result = result * base;
     }
-} else {
-    print(y);
+    return result;
 }
 
-bool condition = (x > 5) and (y < 10);
-if (condition) {
-    int final = x + y;
-    print(final);
-}""",
+int x = 2;
+int y = 3;
+int z = power(x, y);
+print(z);
+
+int counter = 3;
+do {
+    print(counter);
+    counter = counter - 1;
+} while (counter > 0);""",
 
         "Error Example": """// This program contains errors
 int x = true;  // Type error
@@ -468,10 +468,10 @@ def main():
                 🎯 A Comprehensive Three-Phase Compiler
             </p>
             <p style="font-size: 1.3rem; color: rgba(255,255,255,0.95); font-weight: 500; text-shadow: 0 2px 8px rgba(0,0,0,0.3); line-height: 1.6; max-width: 900px; margin: 0 auto;">
-                Built for the <strong>MiniLang</strong> programming language with support for variables, conditionals, loops, and comprehensive type checking
+                Built for the <strong>MiniLang</strong> programming language with full support for variables, functions, loops (for, while, do-while), and type checking
             </p>
             <p style="font-size: 1.1rem; color: rgba(255,255,255,0.85); font-weight: 500; text-shadow: 0 2px 8px rgba(0,0,0,0.3); line-height: 1.5; max-width: 800px; margin: 1rem auto 0;">
-                💡 <em>Hybrid implementation: C++ core for performance • Python fallback for portability</em>
+                💡 <em>Pure Python implementation with advanced parsing and semantic analysis</em>
             </p>
         </div>
         <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
@@ -523,6 +523,21 @@ Assignment: =
             st.code("""
 if (condition) { ... } else { ... }
 while (condition) { ... }
+for (init; condition; update) { ... }
+do { ... } while (condition);
+            """)
+        
+        with st.expander("Functions"):
+            st.code("""
+function returnType name(params) {
+    statements
+    return expression;
+}
+
+// Example:
+function int add(int a, int b) {
+    return a + b;
+}
             """)
         
 
@@ -648,7 +663,7 @@ while (condition) { ... }
         <div style="background: rgba(255, 255, 255, 0.25); backdrop-filter: blur(20px); border-radius: 20px; padding: 2rem 1.5rem; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); border: 2px solid rgba(255, 255, 255, 0.4); text-align: center; min-height: 150px; display: flex; flex-direction: column; justify-content: center;">
             <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎯</div>
             <div style="color: white; font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">Language Features</div>
-            <div style="color: white; font-size: 1rem; font-weight: 500; line-height: 1.4;">Variables, Conditionals, Loops</div>
+            <div style="color: white; font-size: 1rem; font-weight: 500; line-height: 1.4;">Variables, Functions, All Loops</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -683,19 +698,16 @@ while (condition) { ... }
         3. **Semantic Analysis**: Performs type checking and error detection
         
         ### Key Features
-        - ✅ Complete support for variables, conditionals, and loops
+        - ✅ Complete support for variables, functions, and all loop types
+        - ✅ For loops with init/condition/update syntax
+        - ✅ Do-while loops (execute at least once)
+        - ✅ Function declarations with parameters and return values
+        - ✅ Recursion support (factorial, fibonacci, etc.)
         - ✅ Strong type system with automatic type checking
         - ✅ Comprehensive error detection and reporting
         - ✅ Interactive web interface with real-time compilation
         - ✅ Visual AST representation
         - ✅ Symbol table management
-        
-        ### Advanced Features (C++ Core Only)
-        - 🔧 For loops with init/condition/update
-        - 🔧 Do-while loops
-        - 🔧 Function declarations and calls
-        - 🔧 Recursion support
-        - 🔧 Advanced type checking for functions
         
         ### Technologies Used
         - **Python** for compiler implementation

@@ -57,6 +57,39 @@ class WhileStatement(Statement):
     body: List[Statement]
 
 @dataclass
+class ForStatement(Statement):
+    """For loop statement."""
+    init: Optional[Statement]
+    condition: Optional[Expression]
+    update: Optional[Statement]
+    body: List[Statement]
+
+@dataclass
+class DoWhileStatement(Statement):
+    """Do-while loop statement."""
+    body: List[Statement]
+    condition: Expression
+
+@dataclass
+class FunctionDeclaration(Statement):
+    """Function declaration."""
+    return_type: str
+    name: str
+    parameters: List[tuple]  # List of (type, name) tuples
+    body: List[Statement]
+
+@dataclass
+class ReturnStatement(Statement):
+    """Return statement."""
+    value: Optional[Expression]
+
+@dataclass
+class FunctionCall(Expression):
+    """Function call expression."""
+    name: str
+    arguments: List[Expression]
+
+@dataclass
 class Block(Statement):
     """Block statement (group of statements in braces)."""
     statements: List[Statement]
