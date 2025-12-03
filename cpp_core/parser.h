@@ -235,12 +235,32 @@ private:
         // Parse init (variable declaration or assignment)
         std::unique_ptr<ASTNode> init = nullptr;
         if (match(TokenType::INT) || match(TokenType::FLOAT_TYPE) || match(TokenType::BOOL)) {
-            init = parseVarDeclaration();
+            // Parse variable declaration without expecting semicolon
+            std::string type = currentToken().value;
+            advance();
+            
+            expect(TokenType::IDENTIFIER, "Expected identifier after type");
+            std::string name = tokens[position - 1].value;
+            
+            std::unique_ptr<ASTNode> value = nullptr;
+            if (match(TokenType::ASSIGN)) {
+                advance();
+                value = parseExpression();
+            }
+            
+            init = std::make_unique<VarDeclaration>(type, name, std::move(value));
         } else if (match(TokenType::IDENTIFIER)) {
-            init = parseAssignment();
-        } else {
-            expect(TokenType::SEMICOLON, "Expected ';' in for loop init");
+            // Parse assignment without expecting semicolon
+            std::string name = currentToken().value;
+            advance();
+            
+            expect(TokenType::ASSIGN, "Expected '=' in assignment");
+            auto value = parseExpression();
+            init = std::make_unique<Assignment>(name, std::move(value));
         }
+        
+        // Expect semicolon after init
+        expect(TokenType::SEMICOLON, "Expected ';' after for loop init");
         
         // Parse condition
         std::unique_ptr<ASTNode> condition = nullptr;

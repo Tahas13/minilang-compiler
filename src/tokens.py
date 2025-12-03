@@ -48,12 +48,19 @@ class TokenType(Enum):
     IF = auto()
     ELSE = auto()
     WHILE = auto()
+    FOR = auto()
+    DO = auto()
+    
+    # Functions
+    FUNCTION = auto()
+    RETURN = auto()
     
     # I/O
     PRINT = auto()
     
     # Delimiters
     SEMICOLON = auto()     # ;
+    COMMA = auto()         # ,
     LEFT_PAREN = auto()    # (
     RIGHT_PAREN = auto()   # )
     LEFT_BRACE = auto()    # {
@@ -87,6 +94,10 @@ KEYWORDS = {
     'if': TokenType.IF,
     'else': TokenType.ELSE,
     'while': TokenType.WHILE,
+    'for': TokenType.FOR,
+    'do': TokenType.DO,
+    'function': TokenType.FUNCTION,
+    'return': TokenType.RETURN,
     'print': TokenType.PRINT,
     'and': TokenType.AND,
     'or': TokenType.OR,
@@ -111,6 +122,7 @@ SINGLE_CHAR_TOKENS = {
     '<': TokenType.LESS_THAN,
     '=': TokenType.ASSIGN,
     ';': TokenType.SEMICOLON,
+    ',': TokenType.COMMA,
     '(': TokenType.LEFT_PAREN,
     ')': TokenType.RIGHT_PAREN,
     '{': TokenType.LEFT_BRACE,
