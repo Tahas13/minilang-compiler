@@ -1,0 +1,31 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Compiled C++
+cpp_core/*.exe
+cpp_core/*.o
+cpp_core/minilang_compiler
+
+# Test files
+*.ml
+test_*.py
+
+# Logs
+*.log
