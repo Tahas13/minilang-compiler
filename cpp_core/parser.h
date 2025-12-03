@@ -75,9 +75,19 @@ private:
     
     // Parse statement
     std::unique_ptr<ASTNode> parseStatement() {
+        // Function declaration
+        if (match(TokenType::FUNCTION)) {
+            return parseFunctionDeclaration();
+        }
+        
         // Variable declaration
         if (match(TokenType::INT) || match(TokenType::FLOAT_TYPE) || match(TokenType::BOOL)) {
             return parseVarDeclaration();
+        }
+        
+        // Return statement
+        if (match(TokenType::RETURN)) {
+            return parseReturnStatement();
         }
         
         // Print statement
@@ -95,8 +105,22 @@ private:
             return parseWhileStatement();
         }
         
-        // Assignment
+        // For statement
+        if (match(TokenType::FOR)) {
+            return parseForStatement();
+        }
+        
+        // Do-While statement
+        if (match(TokenType::DO)) {
+            return parseDoWhileStatement();
+        }
+        
+        // Assignment or function call
         if (match(TokenType::IDENTIFIER)) {
+            // Look ahead to determine if it's assignment or function call
+            if (peekToken().type == TokenType::LPAREN) {
+                return parseFunctionCallStatement();
+            }
             return parseAssignment();
         }
         
@@ -201,6 +225,168 @@ private:
         expect(TokenType::RBRACE, "Expected '}' after while body");
         
         return whileStmt;
+    }
+    
+    // Parse for statement
+    std::unique_ptr<ASTNode> parseForStatement() {
+        advance(); // consume 'for'
+        expect(TokenType::LPAREN, "Expected '(' after 'for'");
+        
+        // Parse init (variable declaration or assignment)
+        std::unique_ptr<ASTNode> init = nullptr;
+        if (match(TokenType::INT) || match(TokenType::FLOAT_TYPE) || match(TokenType::BOOL)) {
+            init = parseVarDeclaration();
+        } else if (match(TokenType::IDENTIFIER)) {
+            init = parseAssignment();
+        } else {
+            expect(TokenType::SEMICOLON, "Expected ';' in for loop init");
+        }
+        
+        // Parse condition
+        std::unique_ptr<ASTNode> condition = nullptr;
+        if (!match(TokenType::SEMICOLON)) {
+            condition = parseExpression();
+        }
+        expect(TokenType::SEMICOLON, "Expected ';' after for loop condition");
+        
+        // Parse update
+        std::unique_ptr<ASTNode> update = nullptr;
+        if (!match(TokenType::RPAREN)) {
+            if (match(TokenType::IDENTIFIER)) {
+                std::string name = currentToken().value;
+                advance();
+                expect(TokenType::ASSIGN, "Expected '=' in for loop update");
+                auto value = parseExpression();
+                update = std::make_unique<Assignment>(name, std::move(value));
+            }
+        }
+        expect(TokenType::RPAREN, "Expected ')' after for loop header");
+        
+        auto forStmt = std::make_unique<ForStatement>(std::move(init), std::move(condition), std::move(update));
+        
+        expect(TokenType::LBRACE, "Expected '{' after for loop header");
+        while (!match(TokenType::RBRACE) && !match(TokenType::END_OF_FILE)) {
+            auto stmt = parseStatement();
+            if (stmt) {
+                forStmt->body.push_back(std::move(stmt));
+            }
+        }
+        expect(TokenType::RBRACE, "Expected '}' after for loop body");
+        
+        return forStmt;
+    }
+    
+    // Parse do-while statement
+    std::unique_ptr<ASTNode> parseDoWhileStatement() {
+        advance(); // consume 'do'
+        
+        auto doWhileStmt = std::make_unique<DoWhileStatement>(nullptr);
+        
+        expect(TokenType::LBRACE, "Expected '{' after 'do'");
+        while (!match(TokenType::RBRACE) && !match(TokenType::END_OF_FILE)) {
+            auto stmt = parseStatement();
+            if (stmt) {
+                doWhileStmt->body.push_back(std::move(stmt));
+            }
+        }
+        expect(TokenType::RBRACE, "Expected '}' after do body");
+        
+        expect(TokenType::WHILE, "Expected 'while' after do body");
+        expect(TokenType::LPAREN, "Expected '(' after 'while'");
+        doWhileStmt->condition = parseExpression();
+        expect(TokenType::RPAREN, "Expected ')' after condition");
+        expect(TokenType::SEMICOLON, "Expected ';' after do-while statement");
+        
+        return doWhileStmt;
+    }
+    
+    // Parse function declaration
+    std::unique_ptr<ASTNode> parseFunctionDeclaration() {
+        advance(); // consume 'function'
+        
+        // Parse return type
+        if (!match(TokenType::INT) && !match(TokenType::FLOAT_TYPE) && !match(TokenType::BOOL)) {
+            errors.push_back("Expected return type after 'function'");
+            throw std::runtime_error("Expected return type");
+        }
+        std::string returnType = currentToken().value;
+        advance();
+        
+        // Parse function name
+        expect(TokenType::IDENTIFIER, "Expected function name");
+        std::string name = tokens[position - 1].value;
+        
+        auto funcDecl = std::make_unique<FunctionDeclaration>(returnType, name);
+        
+        // Parse parameters
+        expect(TokenType::LPAREN, "Expected '(' after function name");
+        while (!match(TokenType::RPAREN) && !match(TokenType::END_OF_FILE)) {
+            if (!match(TokenType::INT) && !match(TokenType::FLOAT_TYPE) && !match(TokenType::BOOL)) {
+                errors.push_back("Expected parameter type");
+                throw std::runtime_error("Expected parameter type");
+            }
+            std::string paramType = currentToken().value;
+            advance();
+            
+            expect(TokenType::IDENTIFIER, "Expected parameter name");
+            std::string paramName = tokens[position - 1].value;
+            
+            funcDecl->parameters.push_back({paramType, paramName});
+            
+            if (match(TokenType::COMMA)) {
+                advance();
+            } else {
+                break;
+            }
+        }
+        expect(TokenType::RPAREN, "Expected ')' after parameters");
+        
+        // Parse function body
+        expect(TokenType::LBRACE, "Expected '{' after function header");
+        while (!match(TokenType::RBRACE) && !match(TokenType::END_OF_FILE)) {
+            auto stmt = parseStatement();
+            if (stmt) {
+                funcDecl->body.push_back(std::move(stmt));
+            }
+        }
+        expect(TokenType::RBRACE, "Expected '}' after function body");
+        
+        return funcDecl;
+    }
+    
+    // Parse return statement
+    std::unique_ptr<ASTNode> parseReturnStatement() {
+        advance(); // consume 'return'
+        
+        std::unique_ptr<ASTNode> value = nullptr;
+        if (!match(TokenType::SEMICOLON)) {
+            value = parseExpression();
+        }
+        
+        expect(TokenType::SEMICOLON, "Expected ';' after return statement");
+        return std::make_unique<ReturnStatement>(std::move(value));
+    }
+    
+    // Parse function call as statement
+    std::unique_ptr<ASTNode> parseFunctionCallStatement() {
+        std::string name = currentToken().value;
+        advance();
+        
+        auto funcCall = std::make_unique<FunctionCall>(name);
+        
+        expect(TokenType::LPAREN, "Expected '(' after function name");
+        while (!match(TokenType::RPAREN) && !match(TokenType::END_OF_FILE)) {
+            funcCall->arguments.push_back(parseExpression());
+            if (match(TokenType::COMMA)) {
+                advance();
+            } else {
+                break;
+            }
+        }
+        expect(TokenType::RPAREN, "Expected ')' after arguments");
+        expect(TokenType::SEMICOLON, "Expected ';' after function call");
+        
+        return funcCall;
     }
     
     // Parse expression (lowest precedence: or)
@@ -324,10 +510,28 @@ private:
             return std::make_unique<BooleanLiteral>(false);
         }
         
-        // Identifier
+        // Identifier or function call
         if (match(TokenType::IDENTIFIER)) {
             std::string name = currentToken().value;
             advance();
+            
+            // Check if it's a function call
+            if (match(TokenType::LPAREN)) {
+                advance();
+                auto funcCall = std::make_unique<FunctionCall>(name);
+                
+                while (!match(TokenType::RPAREN) && !match(TokenType::END_OF_FILE)) {
+                    funcCall->arguments.push_back(parseExpression());
+                    if (match(TokenType::COMMA)) {
+                        advance();
+                    } else {
+                        break;
+                    }
+                }
+                expect(TokenType::RPAREN, "Expected ')' after arguments");
+                return funcCall;
+            }
+            
             return std::make_unique<Identifier>(name);
         }
         

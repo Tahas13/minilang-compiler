@@ -260,4 +260,126 @@ public:
     std::string getType() const override { return "WhileStatement"; }
 };
 
+// For Statement
+class ForStatement : public ASTNode {
+public:
+    std::unique_ptr<ASTNode> init;
+    std::unique_ptr<ASTNode> condition;
+    std::unique_ptr<ASTNode> update;
+    std::vector<std::unique_ptr<ASTNode>> body;
+    
+    ForStatement(std::unique_ptr<ASTNode> i, std::unique_ptr<ASTNode> c, std::unique_ptr<ASTNode> u)
+        : init(std::move(i)), condition(std::move(c)), update(std::move(u)) {}
+    
+    json toJSON() const override {
+        json j;
+        j["type"] = "ForStatement";
+        j["init"] = init ? init->toJSON() : nullptr;
+        j["condition"] = condition ? condition->toJSON() : nullptr;
+        j["update"] = update ? update->toJSON() : nullptr;
+        j["body"] = json::array();
+        for (const auto& stmt : body) {
+            j["body"].push_back(stmt->toJSON());
+        }
+        return j;
+    }
+    
+    std::string getType() const override { return "ForStatement"; }
+};
+
+// Do-While Statement
+class DoWhileStatement : public ASTNode {
+public:
+    std::unique_ptr<ASTNode> condition;
+    std::vector<std::unique_ptr<ASTNode>> body;
+    
+    DoWhileStatement(std::unique_ptr<ASTNode> cond)
+        : condition(std::move(cond)) {}
+    
+    json toJSON() const override {
+        json j;
+        j["type"] = "DoWhileStatement";
+        j["condition"] = condition->toJSON();
+        j["body"] = json::array();
+        for (const auto& stmt : body) {
+            j["body"].push_back(stmt->toJSON());
+        }
+        return j;
+    }
+    
+    std::string getType() const override { return "DoWhileStatement"; }
+};
+
+// Function Declaration
+class FunctionDeclaration : public ASTNode {
+public:
+    std::string returnType;
+    std::string name;
+    std::vector<std::pair<std::string, std::string>> parameters; // (type, name)
+    std::vector<std::unique_ptr<ASTNode>> body;
+    
+    FunctionDeclaration(const std::string& retType, const std::string& funcName)
+        : returnType(retType), name(funcName) {}
+    
+    json toJSON() const override {
+        json j;
+        j["type"] = "FunctionDeclaration";
+        j["returnType"] = returnType;
+        j["name"] = name;
+        j["parameters"] = json::array();
+        for (const auto& param : parameters) {
+            json p;
+            p["type"] = param.first;
+            p["name"] = param.second;
+            j["parameters"].push_back(p);
+        }
+        j["body"] = json::array();
+        for (const auto& stmt : body) {
+            j["body"].push_back(stmt->toJSON());
+        }
+        return j;
+    }
+    
+    std::string getType() const override { return "FunctionDeclaration"; }
+};
+
+// Function Call
+class FunctionCall : public ASTNode {
+public:
+    std::string name;
+    std::vector<std::unique_ptr<ASTNode>> arguments;
+    
+    FunctionCall(const std::string& funcName) : name(funcName) {}
+    
+    json toJSON() const override {
+        json j;
+        j["type"] = "FunctionCall";
+        j["name"] = name;
+        j["arguments"] = json::array();
+        for (const auto& arg : arguments) {
+            j["arguments"].push_back(arg->toJSON());
+        }
+        return j;
+    }
+    
+    std::string getType() const override { return "FunctionCall"; }
+};
+
+// Return Statement
+class ReturnStatement : public ASTNode {
+public:
+    std::unique_ptr<ASTNode> value;
+    
+    ReturnStatement(std::unique_ptr<ASTNode> val) : value(std::move(val)) {}
+    
+    json toJSON() const override {
+        json j;
+        j["type"] = "ReturnStatement";
+        j["value"] = value ? value->toJSON() : nullptr;
+        return j;
+    }
+    
+    std::string getType() const override { return "ReturnStatement"; }
+};
+
 #endif // AST_H

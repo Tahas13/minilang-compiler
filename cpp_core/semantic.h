@@ -15,15 +15,21 @@
 struct Symbol {
     std::string type;
     bool initialized;
+    bool isFunction;
+    std::vector<std::string> paramTypes;
     
-    Symbol() : type(""), initialized(false) {}
-    Symbol(const std::string& t, bool init = false) : type(t), initialized(init) {}
+    Symbol() : type(""), initialized(false), isFunction(false) {}
+    Symbol(const std::string& t, bool init = false) : type(t), initialized(init), isFunction(false) {}
+    Symbol(const std::string& t, const std::vector<std::string>& params) 
+        : type(t), initialized(true), isFunction(true), paramTypes(params) {}
 };
 
 class SemanticAnalyzer {
 private:
     std::map<std::string, Symbol> symbolTable;
     std::vector<std::string> errors;
+    std::string currentFunction;
+    std::string currentFunctionReturnType;
     
     void addError(const std::string& message) {
         errors.push_back(message);
@@ -48,9 +54,45 @@ private:
                     addError("Undefined variable: " + idNode->name);
                     return "";
                 }
+                if (it->second.isFunction) {
+                    addError("Cannot use function as variable: " + idNode->name);
+                    return "";
+                }
                 if (!it->second.initialized) {
                     addError("Variable used before initialization: " + idNode->name);
                 }
+                return it->second.type;
+            }
+        } else if (type == "FunctionCall") {
+            auto funcCall = dynamic_cast<const FunctionCall*>(node);
+            if (funcCall) {
+                auto it = symbolTable.find(funcCall->name);
+                if (it == symbolTable.end()) {
+                    addError("Undefined function: " + funcCall->name);
+                    return "";
+                }
+                if (!it->second.isFunction) {
+                    addError("Not a function: " + funcCall->name);
+                    return "";
+                }
+                
+                // Check argument count
+                if (funcCall->arguments.size() != it->second.paramTypes.size()) {
+                    addError("Function " + funcCall->name + " expects " + 
+                            std::to_string(it->second.paramTypes.size()) + " arguments, got " +
+                            std::to_string(funcCall->arguments.size()));
+                    return "";
+                }
+                
+                // Check argument types
+                for (size_t i = 0; i < funcCall->arguments.size(); i++) {
+                    std::string argType = analyzeExpression(funcCall->arguments[i].get());
+                    if (!argType.empty() && argType != it->second.paramTypes[i]) {
+                        addError("Argument " + std::to_string(i + 1) + " type mismatch: expected " +
+                                it->second.paramTypes[i] + ", got " + argType);
+                    }
+                }
+                
                 return it->second.type;
             }
         } else if (type == "BinaryOp") {
@@ -193,6 +235,102 @@ private:
                 for (const auto& stmt : whileStmt->body) {
                     analyzeStatement(stmt.get());
                 }
+            }
+        } else if (type == "ForStatement") {
+            auto forStmt = dynamic_cast<const ForStatement*>(node);
+            if (forStmt) {
+                if (forStmt->init) {
+                    analyzeStatement(forStmt->init.get());
+                }
+                
+                if (forStmt->condition) {
+                    std::string condType = analyzeExpression(forStmt->condition.get());
+                    if (!condType.empty() && condType != "bool") {
+                        addError("For condition must be boolean, got " + condType);
+                    }
+                }
+                
+                if (forStmt->update) {
+                    analyzeStatement(forStmt->update.get());
+                }
+                
+                for (const auto& stmt : forStmt->body) {
+                    analyzeStatement(stmt.get());
+                }
+            }
+        } else if (type == "DoWhileStatement") {
+            auto doWhileStmt = dynamic_cast<const DoWhileStatement*>(node);
+            if (doWhileStmt) {
+                for (const auto& stmt : doWhileStmt->body) {
+                    analyzeStatement(stmt.get());
+                }
+                
+                std::string condType = analyzeExpression(doWhileStmt->condition.get());
+                if (!condType.empty() && condType != "bool") {
+                    addError("Do-while condition must be boolean, got " + condType);
+                }
+            }
+        } else if (type == "FunctionDeclaration") {
+            auto funcDecl = dynamic_cast<const FunctionDeclaration*>(node);
+            if (funcDecl) {
+                // Check if function already declared
+                if (symbolTable.find(funcDecl->name) != symbolTable.end()) {
+                    addError("Function already declared: " + funcDecl->name);
+                    return;
+                }
+                
+                // Add function to symbol table
+                std::vector<std::string> paramTypes;
+                for (const auto& param : funcDecl->parameters) {
+                    paramTypes.push_back(param.first);
+                }
+                symbolTable[funcDecl->name] = Symbol(funcDecl->returnType, paramTypes);
+                
+                // Save previous function context
+                std::string prevFunction = currentFunction;
+                std::string prevReturnType = currentFunctionReturnType;
+                
+                currentFunction = funcDecl->name;
+                currentFunctionReturnType = funcDecl->returnType;
+                
+                // Add parameters to symbol table
+                std::map<std::string, Symbol> prevSymbolTable = symbolTable;
+                for (const auto& param : funcDecl->parameters) {
+                    symbolTable[param.second] = Symbol(param.first, true);
+                }
+                
+                // Analyze function body
+                for (const auto& stmt : funcDecl->body) {
+                    analyzeStatement(stmt.get());
+                }
+                
+                // Restore symbol table (remove local variables)
+                symbolTable = prevSymbolTable;
+                
+                // Restore previous function context
+                currentFunction = prevFunction;
+                currentFunctionReturnType = prevReturnType;
+            }
+        } else if (type == "ReturnStatement") {
+            auto returnStmt = dynamic_cast<const ReturnStatement*>(node);
+            if (returnStmt) {
+                if (currentFunction.empty()) {
+                    addError("Return statement outside function");
+                    return;
+                }
+                
+                if (returnStmt->value) {
+                    std::string returnType = analyzeExpression(returnStmt->value.get());
+                    if (!returnType.empty() && returnType != currentFunctionReturnType) {
+                        addError("Return type mismatch: expected " + currentFunctionReturnType + 
+                                ", got " + returnType);
+                    }
+                }
+            }
+        } else if (type == "FunctionCall") {
+            auto funcCall = dynamic_cast<const FunctionCall*>(node);
+            if (funcCall) {
+                analyzeExpression(funcCall);
             }
         }
     }

@@ -19,7 +19,8 @@ This document presents the attributed grammar and semantic rules for the MiniLan
 ```
 Program     → StmtList
 StmtList    → Stmt StmtList | ε
-Stmt        → VarDecl | Assignment | PrintStmt | IfStmt | WhileStmt
+Stmt        → VarDecl | Assignment | PrintStmt | IfStmt | WhileStmt | ForStmt | DoWhileStmt 
+            | FuncDecl | ReturnStmt | FuncCallStmt
 
 VarDecl     → Type ID = Expr ;
             | Type ID ;
@@ -28,6 +29,16 @@ PrintStmt   → print ( Expr ) ;
 IfStmt      → if ( Expr ) { StmtList } ElsePart
 ElsePart    → else { StmtList } | ε
 WhileStmt   → while ( Expr ) { StmtList }
+ForStmt     → for ( ForInit ; Expr ; ForUpdate ) { StmtList }
+ForInit     → VarDecl | Assignment | ε
+ForUpdate   → Assignment | ε
+DoWhileStmt → do { StmtList } while ( Expr ) ;
+FuncDecl    → function Type ID ( ParamList ) { StmtList }
+ParamList   → Param | Param , ParamList | ε
+Param       → Type ID
+ReturnStmt  → return Expr ; | return ;
+FuncCallStmt→ ID ( ArgList ) ;
+ArgList     → Expr | Expr , ArgList | ε
 
 Expr        → OrExpr
 OrExpr      → AndExpr or OrExpr | AndExpr
@@ -299,7 +310,140 @@ WhileStmt → while ( Expr ) { StmtList }
 
 ---
 
-### 4.10 Identifier Expression
+### 4.10 For Statement
+
+#### **Production:**
+```
+ForStmt → for ( ForInit ; Expr ; ForUpdate ) { StmtList }
+```
+
+#### **Semantic Rules:**
+1. **Initialization:**
+   - Analyze `ForInit` (can be variable declaration or assignment)
+   - Variables declared in init are scoped to the for loop
+
+2. **Condition type checking:**
+   - `Type(Expr) = bool`
+   - If `Type(Expr) ≠ bool` → ERROR: "For condition must be boolean"
+
+3. **Update statement:**
+   - Analyze `ForUpdate` (typically assignment)
+
+4. **Body analysis:**
+   - Analyze all statements in `StmtList` with current environment
+
+---
+
+### 4.11 Do-While Statement
+
+#### **Production:**
+```
+DoWhileStmt → do { StmtList } while ( Expr ) ;
+```
+
+#### **Semantic Rules:**
+1. **Body analysis:**
+   - Analyze all statements in `StmtList` with current environment
+   - Body executes at least once before condition check
+
+2. **Condition type checking:**
+   - `Type(Expr) = bool`
+   - If `Type(Expr) ≠ bool` → ERROR: "Do-while condition must be boolean"
+
+---
+
+### 4.12 Function Declaration
+
+#### **Production:**
+```
+FuncDecl → function Type ID ( ParamList ) { StmtList }
+```
+
+#### **Semantic Rules:**
+1. **Function name check:**
+   - If `ID.name ∈ SymbolTable` → ERROR: "Function already declared: ID.name"
+
+2. **Symbol table update:**
+   ```
+   SymbolTable[ID.name] = Symbol {
+       type: Type.value,
+       isFunction: true,
+       paramTypes: [Type₁, Type₂, ..., Typeₙ],
+       initialized: true
+   }
+   ```
+
+3. **Parameter handling:**
+   - Add each parameter to local scope
+   - Each parameter marked as initialized
+
+4. **Body analysis:**
+   - Analyze all statements in function body with local environment
+   - Verify return statements match return type
+
+5. **Scope management:**
+   - Create new scope for function
+   - Restore previous scope after function
+
+---
+
+### 4.13 Function Call
+
+#### **Production:**
+```
+FuncCall → ID ( ArgList )
+```
+
+#### **Semantic Rules:**
+1. **Function existence check:**
+   - If `ID.name ∉ SymbolTable` → ERROR: "Undefined function: ID.name"
+   - If `SymbolTable[ID.name].isFunction = false` → ERROR: "Not a function: ID.name"
+
+2. **Argument count check:**
+   ```
+   if |ArgList| ≠ |ParamList| then
+       ERROR: "Function expects N arguments, got M"
+   ```
+
+3. **Argument type checking:**
+   - For each argument i:
+     ```
+     if Type(Argᵢ) ≠ ParamTypeᵢ then
+         ERROR: "Argument i type mismatch"
+     ```
+
+4. **Result type:**
+   ```
+   Type(FuncCall) = SymbolTable[ID.name].type
+   ```
+
+---
+
+### 4.14 Return Statement
+
+#### **Production:**
+```
+ReturnStmt → return Expr ; | return ;
+```
+
+#### **Semantic Rules:**
+1. **Function context check:**
+   - If not inside function → ERROR: "Return statement outside function"
+
+2. **Return type check:**
+   - If `Expr` present:
+     ```
+     if Type(Expr) ≠ CurrentFunction.returnType then
+         ERROR: "Return type mismatch"
+     ```
+   - If `Expr` absent:
+     ```
+     CurrentFunction.returnType must be void (not yet supported)
+     ```
+
+---
+
+### 4.15 Identifier Expression
 
 #### **Production:**
 ```
@@ -320,7 +464,7 @@ Primary → ID
 
 ---
 
-### 4.11 Literal Expressions
+### 4.16 Literal Expressions
 
 #### **Production (Integer):**
 ```
@@ -397,7 +541,7 @@ int
 
 ## 7. Example Semantic Analysis
 
-### 7.1 Valid Program
+### 7.1 Valid Program - Basic Variables
 
 ```c
 int x = 10;
@@ -418,7 +562,60 @@ if (result) {
 4. Line 5: `result` is `bool`, valid condition ✓
 5. All variables declared and properly typed ✓
 
-### 7.2 Invalid Program (Type Error)
+### 7.2 Valid Program - For Loop
+
+```c
+int sum = 0;
+for (int i = 1; i <= 10; i = i + 1) {
+    sum = sum + i;
+}
+print(sum);
+```
+
+**Semantic Analysis:**
+1. Line 1: Declare `sum` as `int`, initialize to 0 ✓
+2. Line 2: Declare `i` in for loop scope ✓
+3. Line 2: `i <= 10` returns `bool`, valid condition ✓
+4. Line 2: `i = i + 1` valid assignment ✓
+5. Line 3: `sum + i` both `int`, valid ✓
+
+### 7.3 Valid Program - Function
+
+```c
+function int add(int a, int b) {
+    int result = a + b;
+    return result;
+}
+
+int x = add(5, 10);
+print(x);
+```
+
+**Semantic Analysis:**
+1. Line 1-4: Declare function `add` with type `int` ✓
+2. Line 1: Parameters `a` and `b` are `int` ✓
+3. Line 2: Local variable `result` is `int` ✓
+4. Line 3: Return type matches function type ✓
+5. Line 6: Function call with 2 args (correct count) ✓
+6. Line 6: Arguments are `int` (match parameters) ✓
+
+### 7.4 Valid Program - Do-While
+
+```c
+int count = 5;
+do {
+    print(count);
+    count = count - 1;
+} while (count > 0);
+```
+
+**Semantic Analysis:**
+1. Line 1: Declare `count` as `int` ✓
+2. Line 3: `count` is used (declared) ✓
+3. Line 4: Assignment type matches ✓
+4. Line 5: `count > 0` returns `bool`, valid condition ✓
+
+### 7.5 Invalid Program (Type Error)
 
 ```c
 int x = true;  // ERROR: Type mismatch
@@ -426,7 +623,7 @@ int x = true;  // ERROR: Type mismatch
 
 **Error:** "Type mismatch in declaration: expected int, got bool"
 
-### 7.3 Invalid Program (Undefined Variable)
+### 7.6 Invalid Program (Undefined Variable)
 
 ```c
 print(undeclared);  // ERROR: Undefined variable
@@ -434,7 +631,7 @@ print(undeclared);  // ERROR: Undefined variable
 
 **Error:** "Undefined variable: undeclared"
 
-### 7.4 Invalid Program (Condition Type)
+### 7.7 Invalid Program (Condition Type)
 
 ```c
 int x = 10;
@@ -444,6 +641,29 @@ if (x) {  // ERROR: Non-boolean condition
 ```
 
 **Error:** "If condition must be boolean, got int"
+
+### 7.8 Invalid Program (Function Errors)
+
+```c
+function int getValue() {
+    return true;  // ERROR: Return type mismatch
+}
+
+int x = getValue(5);  // ERROR: Too many arguments
+```
+
+**Errors:**
+- "Return type mismatch: expected int, got bool"
+- "Function getValue expects 0 arguments, got 1"
+
+### 7.9 Invalid Program (Return Outside Function)
+
+```c
+int x = 10;
+return x;  // ERROR: Return outside function
+```
+
+**Error:** "Return statement outside function"
 
 ---
 
