@@ -391,12 +391,15 @@ class TypeChecker(ASTVisitor):
     
     def visit(self, node: ASTNode):
         """Generic visit method that dispatches to specific visit methods."""
-        method_name = f"visit_{node.__class__.__name__.lower()}"
-        method_name = method_name.replace('literal', '_literal')
-        method_name = method_name.replace('statement', '_statement')
-        method_name = method_name.replace('declaration', '_declaration')
-        method_name = method_name.replace('binaryop', 'binary_op')
-        method_name = method_name.replace('unaryop', 'unary_op')
+        # Convert camelCase to snake_case
+        class_name = node.__class__.__name__
+        # Insert underscore before capital letters
+        import re
+        method_name = re.sub('([A-Z])', r'_\1', class_name).lower()
+        # Remove leading underscore
+        if method_name.startswith('_'):
+            method_name = method_name[1:]
+        method_name = f"visit_{method_name}"
         
         if hasattr(self, method_name):
             return getattr(self, method_name)(node)
