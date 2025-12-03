@@ -315,6 +315,63 @@ float result = pi * a;
 print(sum);
 print(result);""",
 
+        "For Loop": """// For loop - Sum of numbers 1 to 10
+int sum = 0;
+
+for (int i = 1; i <= 10; i = i + 1) {
+    sum = sum + i;
+}
+
+print(sum);""",
+
+        "Do-While Loop": """// Do-while loop - Countdown from 5
+int count = 5;
+
+do {
+    print(count);
+    count = count - 1;
+} while (count > 0);""",
+
+        "Function - Add": """// Function to add two numbers
+function int add(int a, int b) {
+    int result = a + b;
+    return result;
+}
+
+int x = 10;
+int y = 20;
+int sum = add(x, y);
+print(sum);""",
+
+        "Function - Factorial": """// Recursive factorial function
+function int factorial(int n) {
+    if (n <= 1) {
+        return 1;
+    } else {
+        int result = n * factorial(n - 1);
+        return result;
+    }
+}
+
+int num = 5;
+int fact = factorial(num);
+print(fact);""",
+
+        "Function - Even Check": """// Function to check if number is even
+function bool isEven(int n) {
+    int remainder = n - (n / 2 * 2);
+    bool result = remainder == 0;
+    return result;
+}
+
+int num = 8;
+bool even = isEven(num);
+if (even) {
+    print(1);
+} else {
+    print(0);
+}""",
+
         "Conditional Statements": """// If-else statements
 int score = 85;
 bool passed = false;
@@ -339,36 +396,46 @@ while (counter > 0) {
 
 print(counter);""",
 
-        "Complex Expression": """// Complex arithmetic expression
-int x = 5;
-int y = 10;
-int z = (x + y) * 2;
-
-bool condition = (z > 20) and (x < y);
-
-if (condition) {
-    print(z);
+        "Nested Loops": """// Nested for loops
+for (int i = 1; i <= 3; i = i + 1) {
+    for (int j = 1; j <= 3; j = j + 1) {
+        int product = i * j;
+        print(product);
+    }
 }""",
 
-        "Nested Conditions": """// Nested if-else statements
-int grade = 85;
-int letterGrade = 0;
-
-if (grade >= 90) {
-    letterGrade = 4;
-} else {
-    if (grade >= 80) {
-        letterGrade = 3;
-    } else {
-        if (grade >= 70) {
-            letterGrade = 2;
-        } else {
-            letterGrade = 1;
-        }
-    }
+        "All Features": """// Comprehensive example
+function bool isEven(int n) {
+    int remainder = n - (n / 2 * 2);
+    bool result = remainder == 0;
+    return result;
 }
 
-print(letterGrade);""",
+function int power(int base, int exp) {
+    int result = 1;
+    for (int i = 0; i < exp; i = i + 1) {
+        result = result * base;
+    }
+    return result;
+}
+
+int x = 2;
+int y = 3;
+int z = power(x, y);
+print(z);
+
+bool even = isEven(z);
+if (even) {
+    print(1);
+} else {
+    print(0);
+}
+
+int counter = 3;
+do {
+    print(counter);
+    counter = counter - 1;
+} while (counter > 0);""",
 
         "Error Example": """// This program contains errors
 int x = true;  // Type error
@@ -428,8 +495,11 @@ def main():
             <p style="font-size: 2rem; color: white; font-weight: 700; margin-bottom: 1rem; text-shadow: 0 4px 15px rgba(0,0,0,0.4); line-height: 1.4;">
                 🎯 A Comprehensive Three-Phase Compiler
             </p>
-            <p style="font-size: 1.3rem; color: rgba(255,255,255,0.95); font-weight: 500; text-shadow: 0 2px 8px rgba(0,0,0,0.3); line-height: 1.6; max-width: 800px; margin: 0 auto;">
-                Built for the <strong>MiniLang</strong> programming language with full support for variables, control flow, and type checking
+            <p style="font-size: 1.3rem; color: rgba(255,255,255,0.95); font-weight: 500; text-shadow: 0 2px 8px rgba(0,0,0,0.3); line-height: 1.6; max-width: 900px; margin: 0 auto;">
+                Built for the <strong>MiniLang</strong> programming language with full support for variables, functions, loops (for, while, do-while), and type checking
+            </p>
+            <p style="font-size: 1.1rem; color: rgba(255,255,255,0.85); font-weight: 500; text-shadow: 0 2px 8px rgba(0,0,0,0.3); line-height: 1.5; max-width: 800px; margin: 1rem auto 0;">
+                💡 <em>Core compiler implemented in C++17 • Web interface uses Python fallback</em>
             </p>
         </div>
         <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-top: 2rem;">
@@ -440,7 +510,7 @@ def main():
                 📚 <strong>Course:</strong> CS-4031 - Compiler Construction
             </span>
             <span class="info-badge" style="font-size: 1.05rem; padding: 0.8rem 1.8rem;">
-                🏆 <strong>Implementation:</strong> 3-Phase Compilation System
+                🏆 <strong>Implementation:</strong> Hybrid C++/Python System
             </span>
         </div>
     </div>
@@ -479,9 +549,23 @@ Assignment: =
         
         with st.expander("Control Flow"):
             st.code("""
-if (condition) { ... }
-else { ... }
+if (condition) { ... } else { ... }
 while (condition) { ... }
+for (init; condition; update) { ... }
+do { ... } while (condition);
+            """)
+        
+        with st.expander("Functions"):
+            st.code("""
+function returnType name(params) {
+    statements
+    return expression;
+}
+
+// Example:
+function int add(int a, int b) {
+    return a + b;
+}
             """)
 
     # Main content area
@@ -605,7 +689,7 @@ while (condition) { ... }
         <div style="background: rgba(255, 255, 255, 0.25); backdrop-filter: blur(20px); border-radius: 20px; padding: 2rem 1.5rem; box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15); border: 2px solid rgba(255, 255, 255, 0.4); text-align: center; min-height: 150px; display: flex; flex-direction: column; justify-content: center;">
             <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🎯</div>
             <div style="color: white; font-weight: 600; font-size: 1.1rem; margin-bottom: 0.5rem;">Language Features</div>
-            <div style="color: white; font-size: 1rem; font-weight: 500; line-height: 1.4;">Variables, Conditionals, Loops</div>
+            <div style="color: white; font-size: 1rem; font-weight: 500; line-height: 1.4;">Variables, Functions, Loops</div>
         </div>
         """, unsafe_allow_html=True)
     
@@ -640,12 +724,13 @@ while (condition) { ... }
         3. **Semantic Analysis**: Performs type checking and error detection
         
         ### Key Features
-        - ✅ Complete support for variables, conditionals, and loops
+        - ✅ Complete support for variables, functions, and loops (for, while, do-while)
+        - ✅ Function declarations with parameters and recursion support
         - ✅ Strong type system with automatic type checking
         - ✅ Comprehensive error detection and reporting
         - ✅ Interactive web interface with real-time compilation
         - ✅ Visual AST representation
-        - ✅ Symbol table management
+        - ✅ Symbol table management with function tracking
         
         ### Technologies Used
         - **Python** for compiler implementation
