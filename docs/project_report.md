@@ -73,16 +73,536 @@ while (a > 0) {
 }
 ```
 
-## 3. Compiler Architecture
+## 3. Context-Free Grammar (CFG)
 
-### 3.1 Overall Design
+### 3.1 Complete Grammar Specification
+
+The MiniLang grammar is designed to be LL(1) compatible, supporting predictive parsing with one-token lookahead. The grammar is unambiguous and implements operator precedence through production nesting.
+
+#### Production Rules
+
+```
+1.  Program          → StatementList
+2.  StatementList    → Statement StatementList | ε
+3.  Statement        → VarDecl | Assignment | PrintStmt | IfStmt 
+                      | WhileStmt | ForStmt | DoWhileStmt 
+                      | FunctionDecl | ReturnStmt | Block | FunctionCallStmt
+4.  VarDecl          → Type IDENTIFIER ('=' Expression)? ';'
+5.  Assignment       → IDENTIFIER '=' Expression ';'
+6.  PrintStmt        → 'print' '(' Expression ')' ';'
+7.  IfStmt           → 'if' '(' Expression ')' Statement ('else' Statement)?
+8.  WhileStmt        → 'while' '(' Expression ')' Statement
+9.  ForStmt          → 'for' '(' (VarDecl | Assignment)? ';' 
+                                  Expression? ';' 
+                                  Assignment? ')' Statement
+10. DoWhileStmt      → 'do' Statement 'while' '(' Expression ')' ';'
+11. FunctionDecl     → 'function' Type IDENTIFIER '(' ParamList? ')' Block
+12. ParamList        → Type IDENTIFIER (',' Type IDENTIFIER)*
+13. ReturnStmt       → 'return' Expression? ';'
+14. FunctionCallStmt → IDENTIFIER '(' ArgList? ')' ';'
+15. Block            → '{' StatementList '}'
+
+16. Expression       → LogicalOr
+17. LogicalOr        → LogicalAnd ('or' LogicalAnd)*
+18. LogicalAnd       → Equality ('and' Equality)*
+19. Equality         → Relational (('==' | '!=') Relational)*
+20. Relational       → Additive (('>' | '<' | '>=' | '<=') Additive)*
+21. Additive         → Multiplicative (('+' | '-') Multiplicative)*
+22. Multiplicative   → Unary (('*' | '/') Unary)*
+23. Unary            → ('not' | '-') Unary | Primary
+24. Primary          → IDENTIFIER | INTEGER | FLOAT | BOOLEAN 
+                      | '(' Expression ')' | FunctionCall
+25. FunctionCall     → IDENTIFIER '(' ArgList? ')'
+26. ArgList          → Expression (',' Expression)*
+
+27. Type             → 'int' | 'float' | 'bool'
+```
+
+### 3.2 Terminal Symbols
+
+**Keywords:**
+```
+int, float, bool, true, false, if, else, while, for, do, 
+function, return, print, and, or, not
+```
+
+**Operators:**
+```
+Arithmetic:  +  -  *  /
+Relational:  >  <  >=  <=  ==  !=
+Logical:     and  or  not
+Assignment:  =
+```
+
+**Delimiters:**
+```
+;  ,  (  )  {  }
+```
+
+**Literals:**
+```
+INTEGER:     [0-9]+
+FLOAT:       [0-9]+\.[0-9]+
+BOOLEAN:     true | false
+IDENTIFIER:  [a-zA-Z_][a-zA-Z0-9_]*
+```
+
+### 3.3 Non-Terminal Symbols
+
+```
+Program, StatementList, Statement, VarDecl, Assignment, PrintStmt,
+IfStmt, WhileStmt, ForStmt, DoWhileStmt, FunctionDecl, ParamList,
+ReturnStmt, FunctionCallStmt, Block, Expression, LogicalOr, 
+LogicalAnd, Equality, Relational, Additive, Multiplicative, 
+Unary, Primary, FunctionCall, ArgList, Type
+```
+
+### 3.4 Operator Precedence and Associativity
+
+| Level | Operators | Associativity | Description |
+|-------|-----------|---------------|-------------|
+| 1 (Lowest) | `or` | Left | Logical OR |
+| 2 | `and` | Left | Logical AND |
+| 3 | `==`, `!=` | Left | Equality |
+| 4 | `>`, `<`, `>=`, `<=` | Left | Relational |
+| 5 | `+`, `-` | Left | Additive |
+| 6 | `*`, `/` | Left | Multiplicative |
+| 7 | `not`, `-` (unary) | Right | Unary |
+| 8 (Highest) | `()`, literals, identifiers | - | Primary |
+
+### 3.5 Grammar Properties
+
+**LL(1) Compatibility:**
+- No left recursion
+- Predictable first sets for each production
+- One-token lookahead sufficient for parsing decisions
+
+**Operator Precedence:**
+- Implemented through nesting depth of productions
+- Lower precedence operators at higher grammar levels
+- Natural precedence without conflicts
+
+**Left Associativity:**
+- Achieved through iterative right-hand side processing
+- Example: `a + b + c` parsed as `(a + b) + c`
+
+## 4. Semantic Rules
+
+### 4.1 Type System
+
+#### 4.1.1 Type Compatibility Matrix
+
+| Operation | Left Type | Right Type | Result Type | Valid? |
+|-----------|-----------|------------|-------------|---------|
+| +, -, *, / | int | int | int | ✓ |
+| +, -, *, / | int | float | float | ✓ |
+| +, -, *, / | float | int | float | ✓ |
+| +, -, *, / | float | float | float | ✓ |
+| +, -, *, / | bool | any | - | ✗ |
+| >, <, >=, <= | int | int | bool | ✓ |
+| >, <, >=, <= | int | float | bool | ✓ |
+| >, <, >=, <= | float | int | bool | ✓ |
+| >, <, >=, <= | float | float | bool | ✓ |
+| >, <, >=, <= | bool | any | - | ✗ |
+| ==, != | int | int | bool | ✓ |
+| ==, != | float | float | bool | ✓ |
+| ==, != | bool | bool | bool | ✓ |
+| ==, != | int | float | bool | ✓ |
+| ==, != | different types | - | - | ✗ |
+| and, or | bool | bool | bool | ✓ |
+| and, or | non-bool | any | - | ✗ |
+
+#### 4.1.2 Assignment Compatibility
+
+```
+can_assign(target_type, source_type):
+    if target_type == source_type:
+        return True
+    if target_type == "float" and source_type == "int":
+        return True  // Implicit int to float conversion
+    return False
+```
+
+### 4.2 Semantic Rules with Attributed Grammar
+
+#### Rule 1: Variable Declaration
+```
+VarDecl → Type IDENTIFIER ('=' Expression)? ';'
+
+Semantic Actions:
+{
+    // Check for redeclaration in current scope
+    if (lookup(IDENTIFIER.lexeme) in current_scope) {
+        error("Variable '" + IDENTIFIER.lexeme + "' already declared");
+    } else {
+        if (has_initialization) {
+            expr_type = get_type(Expression);
+            if (!can_assign(Type.type, expr_type)) {
+                error("Cannot assign " + expr_type + " to " + Type.type);
+            }
+            define_symbol(IDENTIFIER.lexeme, Type.type, initialized=true);
+        } else {
+            define_symbol(IDENTIFIER.lexeme, Type.type, initialized=false);
+        }
+    }
+}
+```
+
+**Examples:**
+```minilang
+int x = 10;        // ✓ Valid: int = int
+float y = 5;       // ✓ Valid: int→float conversion
+bool z = 3 + 5;    // ✗ Error: Cannot assign int to bool
+int x = 20;        // ✗ Error: Variable already declared
+```
+
+#### Rule 2: Assignment Statement
+```
+Assignment → IDENTIFIER '=' Expression ';'
+
+Semantic Actions:
+{
+    symbol = lookup(IDENTIFIER.lexeme);
+    if (symbol == null) {
+        error("Undefined variable: " + IDENTIFIER.lexeme);
+    } else {
+        expr_type = get_type(Expression);
+        if (!can_assign(symbol.type, expr_type)) {
+            error("Cannot assign " + expr_type + " to " + symbol.type);
+        }
+        symbol.initialized = true;
+    }
+}
+```
+
+#### Rule 3: Arithmetic Operations
+```
+Additive → Multiplicative (('+' | '-') Multiplicative)*
+
+Semantic Actions:
+{
+    left_type = get_type(Multiplicative₁);
+    right_type = get_type(Multiplicative₂);
+    
+    if (left_type == "int" && right_type == "int") {
+        result_type = "int";
+    } else if ((left_type in {"int", "float"}) && 
+               (right_type in {"int", "float"})) {
+        result_type = "float";
+    } else {
+        error("Invalid operand types for arithmetic operation");
+    }
+}
+```
+
+#### Rule 4: Relational Operations
+```
+Relational → Additive (('>' | '<' | '>=' | '<=') Additive)*
+
+Semantic Actions:
+{
+    left_type = get_type(Additive₁);
+    right_type = get_type(Additive₂);
+    
+    if ((left_type in {"int", "float"}) && 
+        (right_type in {"int", "float"})) {
+        result_type = "bool";
+    } else {
+        error("Relational operators require numeric operands");
+    }
+}
+```
+
+#### Rule 5: Logical Operations
+```
+LogicalAnd → Equality ('and' Equality)*
+
+Semantic Actions:
+{
+    left_type = get_type(Equality₁);
+    right_type = get_type(Equality₂);
+    
+    if (left_type == "bool" && right_type == "bool") {
+        result_type = "bool";
+    } else {
+        error("Logical operators require boolean operands");
+    }
+}
+```
+
+#### Rule 6: Control Flow Conditions
+```
+IfStmt → 'if' '(' Expression ')' Statement ('else' Statement)?
+
+Semantic Actions:
+{
+    condition_type = get_type(Expression);
+    if (condition_type != "bool") {
+        error("If condition must be boolean, got " + condition_type);
+    }
+    
+    enter_scope();
+    process(Statement₁);
+    if (has_else) {
+        process(Statement₂);
+    }
+    exit_scope();
+}
+```
+
+```
+WhileStmt → 'while' '(' Expression ')' Statement
+
+Semantic Actions:
+{
+    condition_type = get_type(Expression);
+    if (condition_type != "bool") {
+        error("While condition must be boolean");
+    }
+    
+    enter_scope();
+    process(Statement);
+    exit_scope();
+}
+```
+
+#### Rule 7: For Loop
+```
+ForStmt → 'for' '(' Init? ';' Condition? ';' Update? ')' Statement
+
+Semantic Actions:
+{
+    enter_scope();  // Loop variables scoped to loop
+    
+    if (has_init) {
+        process(Init);
+    }
+    
+    if (has_condition) {
+        condition_type = get_type(Condition);
+        if (condition_type != "bool") {
+            error("For loop condition must be boolean");
+        }
+    }
+    
+    if (has_update) {
+        process(Update);
+    }
+    
+    process(Statement);
+    exit_scope();
+}
+```
+
+#### Rule 8: Do-While Loop
+```
+DoWhileStmt → 'do' Statement 'while' '(' Expression ')' ';'
+
+Semantic Actions:
+{
+    process(Statement);  // Body executes at least once
+    
+    condition_type = get_type(Expression);
+    if (condition_type != "bool") {
+        error("Do-while condition must be boolean");
+    }
+}
+```
+
+#### Rule 9: Function Declaration
+```
+FunctionDecl → 'function' Type IDENTIFIER '(' ParamList? ')' Block
+
+Semantic Actions:
+{
+    if (lookup(IDENTIFIER.lexeme) in current_scope) {
+        error("Function already declared: " + IDENTIFIER.lexeme);
+    }
+    
+    param_types = extract_parameter_types(ParamList);
+    define_function(IDENTIFIER.lexeme, Type.type, param_types);
+    
+    enter_scope();
+    
+    // Add parameters to function scope
+    for each (param_type, param_name) in ParamList {
+        define_symbol(param_name, param_type, initialized=true);
+    }
+    
+    process(Block);
+    exit_scope();
+}
+```
+
+#### Rule 10: Function Call
+```
+FunctionCall → IDENTIFIER '(' ArgList? ')'
+
+Semantic Actions:
+{
+    symbol = lookup(IDENTIFIER.lexeme);
+    if (symbol == null) {
+        error("Undefined function: " + IDENTIFIER.lexeme);
+    }
+    
+    if (!symbol.is_function) {
+        error("'" + IDENTIFIER.lexeme + "' is not a function");
+    }
+    
+    arg_types = get_types(ArgList);
+    if (length(arg_types) != length(symbol.param_types)) {
+        error("Expected " + length(symbol.param_types) + 
+              " arguments, got " + length(arg_types));
+    }
+    
+    for i in range(length(arg_types)) {
+        if (!can_assign(symbol.param_types[i], arg_types[i])) {
+            error("Argument " + (i+1) + " type mismatch");
+        }
+    }
+    
+    result_type = symbol.type;  // Function return type
+}
+```
+
+#### Rule 11: Return Statement
+```
+ReturnStmt → 'return' Expression? ';'
+
+Semantic Actions:
+{
+    if (!in_function_context) {
+        error("Return statement outside function");
+    }
+    
+    if (has_expression) {
+        expr_type = get_type(Expression);
+        if (!can_assign(current_function.return_type, expr_type)) {
+            error("Return type mismatch");
+        }
+    }
+}
+```
+
+#### Rule 12: Block Scope
+```
+Block → '{' StatementList '}'
+
+Semantic Actions:
+{
+    enter_scope();  // Create new child scope
+    process(StatementList);
+    exit_scope();   // Restore parent scope, discard block variables
+}
+```
+
+#### Rule 13: Variable Reference
+```
+Primary → IDENTIFIER
+
+Semantic Actions:
+{
+    symbol = lookup(IDENTIFIER.lexeme);
+    if (symbol == null) {
+        error("Undefined variable: " + IDENTIFIER.lexeme);
+    }
+    
+    if (!symbol.initialized) {
+        error("Variable used before initialization: " + IDENTIFIER.lexeme);
+    }
+    
+    result_type = symbol.type;
+}
+```
+
+### 4.3 Symbol Table Structure
+
+```
+Symbol {
+    name: string
+    type: string  // "int", "float", "bool", or return type for functions
+    initialized: boolean
+    is_function: boolean
+    param_types: list<string>  // For functions only
+    line: integer
+    column: integer
+}
+
+SymbolTable {
+    symbols: Map<string, Symbol>
+    parent: SymbolTable
+    
+    methods:
+        lookup(name): Symbol           // Search this and parent scopes
+        define(name, type, ...): bool  // Add to current scope
+        is_defined(name): bool
+        create_child_scope(): SymbolTable
+}
+```
+
+### 4.4 Scope Rules
+
+**Hierarchical Scoping:**
+1. Global scope contains top-level declarations
+2. Each `{...}` block creates a new child scope
+3. Function bodies create child scopes
+4. For loops create child scopes (loop variables local to loop)
+
+**Variable Lookup:**
+1. Search current scope first
+2. If not found, recursively search parent scope
+3. Continue up scope chain to global scope
+4. If not found anywhere, report error
+
+**Variable Shadowing:**
+```minilang
+int x = 10;     // Global x
+{
+    int x = 20; // Local x (shadows global)
+    print(x);   // Prints 20
+}
+print(x);       // Prints 10 (global x)
+```
+
+### 4.5 Error Categories
+
+**Semantic Errors Detected:**
+
+1. **Type Errors**
+   - Incompatible types in operations
+   - Invalid type assignments
+   - Wrong function argument types
+
+2. **Declaration Errors**
+   - Variable redeclaration in same scope
+   - Function redeclaration
+
+3. **Reference Errors**
+   - Use of undeclared variables
+   - Use of undeclared functions
+
+4. **Initialization Errors**
+   - Use of uninitialized variables
+
+5. **Control Flow Errors**
+   - Non-boolean conditions in if/while/for/do-while
+   - Return outside function
+
+6. **Function Errors**
+   - Wrong number of arguments
+   - Argument type mismatches
+   - Return type mismatches
+
+## 5. Compiler Architecture
+
+### 5.1 Overall Design
 The MiniLang compiler follows a traditional multi-pass architecture with three main phases:
 
 ```
 Source Code → Scanner → Parser → Semantic Analyzer → Success/Error Report
 ```
 
-### 3.2 Phase 1: Lexical Analysis (Scanner)
+### 5.2 Phase 1: Lexical Analysis (Scanner)
 
 **Implementation:** `src/scanner.py`
 
@@ -107,7 +627,7 @@ Source Code → Scanner → Parser → Semantic Analyzer → Success/Error Repor
 - Comprehensive error recovery mechanisms
 - Efficient string processing with position tracking
 
-### 3.3 Phase 2: Syntax Analysis (Parser)
+### 5.3 Phase 2: Syntax Analysis (Parser)
 
 **Implementation:** `src/parser.py`
 
@@ -129,7 +649,7 @@ The parser implements a complete recursive descent parser for the MiniLang gramm
 - Statement parsing for all MiniLang constructs
 - Error recovery at statement boundaries
 
-### 3.4 Phase 3: Semantic Analysis
+### 5.4 Phase 3: Semantic Analysis
 
 **Implementation:** `src/semantic_analyzer.py`
 
@@ -163,9 +683,9 @@ Symbol {
 4. **Operations**: Type-specific operator validation
 5. **Control Flow**: Boolean condition requirements
 
-## 4. Implementation Details
+## 6. Implementation Details
 
-### 4.1 Error Handling Strategy
+### 6.1 Error Handling Strategy
 
 **Lexical Errors:**
 - Invalid characters with position information
@@ -185,7 +705,7 @@ Symbol {
 - Use of uninitialized variables
 - Invalid condition types in control structures
 
-### 4.2 Key Algorithms
+### 6.2 Key Algorithms
 
 **Scanner Algorithm:**
 ```python
@@ -225,7 +745,7 @@ def check_binary_operation(left_type, operator, right_type):
     # ... other operator types
 ```
 
-### 4.3 Testing Framework
+### 6.3 Testing Framework
 
 **Test Categories:**
 1. **Valid Programs**: Correct syntax and semantics
@@ -239,9 +759,9 @@ def check_binary_operation(left_type, operator, right_type):
 - Complex nested structures
 - Type system boundary cases
 
-## 5. Results and Analysis
+## 7. Results and Analysis
 
-### 5.1 Compiler Performance
+### 7.1 Compiler Performance
 
 **Lexical Analysis:**
 - Successfully tokenizes all valid MiniLang constructs
@@ -258,7 +778,7 @@ def check_binary_operation(left_type, operator, right_type):
 - Proper scope management
 - Detailed error reporting
 
-### 5.2 Test Results
+### 7.2 Test Results
 
 The compiler was tested with multiple test cases:
 
@@ -274,7 +794,7 @@ The compiler was tested with multiple test cases:
 - Accurate error messages with position information
 - Graceful handling of multiple errors
 
-### 5.3 Language Features Validation
+### 7.3 Language Features Validation
 
 ✅ **Successfully Implemented:**
 - Complete lexical analysis
@@ -289,9 +809,9 @@ The compiler was tested with multiple test cases:
 - Semantic analyzer validates types and scope rules
 - Error recovery allows continued processing
 
-## 6. Challenges and Solutions
+## 8. Challenges and Solutions
 
-### 6.1 Technical Challenges
+### 8.1 Technical Challenges
 
 **Challenge 1: Operator Precedence**
 - **Problem**: Implementing correct precedence in recursive descent parser
@@ -309,7 +829,7 @@ The compiler was tested with multiple test cases:
 - **Problem**: Balancing simplicity with completeness
 - **Solution**: Clear rules with implicit conversions where sensible
 
-### 6.2 Design Decisions
+### 8.2 Design Decisions
 
 **Decision 1: Recursive Descent Parsing**
 - **Rationale**: Clear, maintainable, and easy to extend
@@ -326,38 +846,38 @@ The compiler was tested with multiple test cases:
 - **Alternative**: Dynamic typing
 - **Justification**: Better for learning compiler concepts
 
-## 7. Future Enhancements
+## 9. Future Enhancements
 
-### 7.1 Language Extensions
+### 9.1 Language Extensions
 - **Functions**: User-defined functions with parameters
 - **Arrays**: Basic array support with indexing
 - **Strings**: String literals and operations
 - **For Loops**: Additional iteration constructs
 
-### 7.2 Compiler Improvements
+### 9.2 Compiler Improvements
 - **Code Generation**: Intermediate code or assembly generation
 - **Optimization**: Basic optimization passes
 - **Better Error Messages**: More descriptive error reporting
 - **IDE Integration**: Language server protocol support
 
-### 7.3 Advanced Features
+### 9.3 Advanced Features
 - **Type Inference**: Automatic type deduction
 - **Generics**: Parameterized types
 - **Modules**: Separate compilation units
 - **Memory Management**: Automatic memory handling
 
-## 8. Conclusion
+## 10. Conclusion
 
 The MiniLang compiler project successfully demonstrates the fundamental principles of compiler construction. The implementation covers all essential phases of compilation with robust error handling and comprehensive testing. The project achieves its educational objectives by providing a clear, well-documented example of compiler design and implementation.
 
-### 8.1 Key Achievements
+### 10.1 Key Achievements
 - ✅ Complete three-phase compiler implementation
 - ✅ Comprehensive error detection and reporting
 - ✅ Robust testing framework with extensive test coverage
 - ✅ Clean, maintainable, and well-documented code
 - ✅ Educational value for understanding compiler concepts
 
-### 8.2 Learning Outcomes
+### 10.2 Learning Outcomes
 Through this project, we gained practical experience in:
 - Lexical analysis techniques and implementation
 - Grammar design and parser construction
@@ -365,7 +885,7 @@ Through this project, we gained practical experience in:
 - Error handling and recovery strategies
 - Software engineering practices for compiler development
 
-### 8.3 Project Success Metrics
+### 10.3 Project Success Metrics
 - **Functionality**: All specified features implemented and working
 - **Quality**: Comprehensive testing with high code quality
 - **Documentation**: Complete documentation with examples
