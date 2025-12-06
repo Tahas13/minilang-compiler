@@ -25,6 +25,7 @@ class Scanner:
         self.line = 1
         self.column = 1
         self.tokens = []
+        self.errors = []  # Track lexical errors
         
     def current_char(self) -> Optional[str]:
         """Returns the current character or None if at end of input."""
@@ -183,6 +184,7 @@ class Scanner:
     def tokenize(self) -> List[Token]:
         """Tokenize the entire source code."""
         self.tokens = []
+        self.errors = []  # Reset errors
         
         try:
             while True:
@@ -194,6 +196,7 @@ class Scanner:
             return self.tokens
         
         except LexicalError as e:
+            self.errors.append(str(e))
             print(f"Lexical Analysis Error: {e}")
             return []
     

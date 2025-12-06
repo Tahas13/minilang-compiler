@@ -593,6 +593,13 @@ function int add(int a, int b) {
                         display_tokens(tokens)
             else:
                 st.markdown('<div class="error-box">❌ Lexical analysis failed!</div>', unsafe_allow_html=True)
+                
+                # Display scanner errors
+                if scanner.errors:
+                    st.error(f"Found {len(scanner.errors)} lexical error(s):")
+                    for i, error in enumerate(scanner.errors, 1):
+                        st.markdown(f"**{i}.** {error}")
+                
                 st.stop()
             
             # Phase 2: Syntax Analysis
