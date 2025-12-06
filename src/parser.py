@@ -42,6 +42,7 @@ class Parser:
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
         self.current = 0
+        self.errors = []  # Track parsing errors
     
     def current_token(self) -> Token:
         """Get the current token."""
@@ -96,9 +97,15 @@ class Parser:
         """Parse the tokens into an AST."""
         try:
             statements = self.parse_program()
+            # If there were any errors during parsing, return None
+            if self.errors:
+                for error in self.errors:
+                    print(f"Parser Error: {error}")
+                return None
             return Program(statements)
         except ParseError as e:
             print(f"Parser Error: {e}")
+            self.errors.append(str(e))
             return None
     
     def parse_program(self) -> List[Statement]:
@@ -115,6 +122,8 @@ class Parser:
                 if stmt:
                     statements.append(stmt)
             except ParseError as e:
+                # Record the error
+                self.errors.append(str(e))
                 print(f"Parser Error: {e}")
                 self.synchronize()
         
