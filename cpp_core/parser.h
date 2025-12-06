@@ -573,7 +573,12 @@ public:
     
     std::unique_ptr<Program> parse() {
         try {
-            return parseProgram();
+            auto program = parseProgram();
+            // If there were any errors during parsing, return nullptr
+            if (!errors.empty()) {
+                return nullptr;
+            }
+            return program;
         } catch (const std::exception& e) {
             return nullptr;
         }

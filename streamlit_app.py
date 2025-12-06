@@ -618,6 +618,13 @@ function int add(int a, int b) {
                         st.markdown(f'<div class="ast-container">{ast_output}</div>', unsafe_allow_html=True)
             else:
                 st.markdown('<div class="error-box">❌ Syntax analysis failed!</div>', unsafe_allow_html=True)
+                
+                # Display parser errors
+                if parser.errors:
+                    st.error(f"Found {len(parser.errors)} syntax error(s):")
+                    for i, error in enumerate(parser.errors, 1):
+                        st.markdown(f"**{i}.** {error}")
+                
                 st.stop()
             
             # Phase 3: Semantic Analysis
